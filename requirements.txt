@@ -1,9 +1,6 @@
 streamlit==1.45.0
 pandas==2.2.3
-numpy==1.26.4
 plotly
 python-docx==1.2.0
-streamlit-authenticator
-streamlit-option-menu
-openai
 requests==2.32.3
+openai
