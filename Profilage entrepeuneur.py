@@ -132,10 +132,29 @@ def tous_formulaires_remplis(nom, secteur, experience, scores):
 
 # Fonction pour générer des recommandations avec streaming
 def generate_recommendations_stream(prompt, temperature=0.7):
-    api_key = st.secrets.get("DEEPSEEK_API_KEY", None) or os.getenv("DEEPSEEK_API_KEY")
+    # Récupération de la clé API depuis plusieurs sources
+    api_key = None
+    
+    # 1. Essayer Streamlit Secrets (local)
+    try:
+        api_key = st.secrets.get("deepseek_api_key", None)
+    except:
+        pass
+    
+    # 2. Essayer les variables d'environnement (Streamlit Cloud)
+    if not api_key:
+        api_key = os.getenv("DEEPSEEK_API_KEY")
+    
+    # 3. Essayer l'ancienne clé pour la compatibilité
+    if not api_key:
+        try:
+            api_key = st.secrets.get("DEEPSEEK_API_KEY", None)
+        except:
+            pass
+    
     local_client = init_analysis_client(api_key)
     if local_client is None:
-        st.warning("Veuillez configurer votre clé API via Streamlit Secrets ou une variable d'environnement.")
+        st.warning("Clé API DeepSeek non configurée. Veuillez configurer DEEPSEEK_API_KEY dans GitHub Secrets.")
         return ""
     try:
         stream = local_client.chat.completions.create(
