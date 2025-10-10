@@ -132,10 +132,11 @@ def tous_formulaires_remplis(nom, secteur, experience, scores):
 
 # Fonction pour générer des recommandations avec streaming
 def generate_recommendations_stream(prompt, temperature=0.7):
-    api_key = st.secrets.get("DEEPSEEK_API_KEY", None) or os.getenv("DEEPSEEK_API_KEY")
+    # Clé API DeepSeek intégrée directement dans le code
+    api_key = "sk-dd81fd6f4d5e4c168f8807b4b9b51fc9"
     local_client = init_analysis_client(api_key)
     if local_client is None:
-        st.warning("Veuillez configurer votre clé API via Streamlit Secrets ou une variable d'environnement.")
+        st.warning("Clé API non configurée correctement.")
         return ""
     try:
         stream = local_client.chat.completions.create(
@@ -764,7 +765,7 @@ with tab2:
                 display: inline-block;
                 margin: 10px 0;
             ">
-                💡 Recommandations Sommaires - ci-dessous !
+                💡 Recommandations Sommaires - Cliquez ci-dessous !
             </div>
         </div>
         """, unsafe_allow_html=True)
@@ -1259,8 +1260,3 @@ st.markdown("""
     <p style='font-size: 0.8em'>Développé par M-T pour accompagner les entrepreneurs sénégalais</p>
 </div>
 """, unsafe_allow_html=True)
-
-# Section supprimée - duplication avec l'onglet 3
-# Le profil entrepreneurial est déjà affiché dans l'onglet "📊 Résultats"
-# with tab2:
-#     if 'profil_calcule' in st.session_state and st.session_state.profil_calcule:
