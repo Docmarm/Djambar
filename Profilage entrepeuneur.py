@@ -132,11 +132,10 @@ def tous_formulaires_remplis(nom, secteur, experience, scores):
 
 # Fonction pour générer des recommandations avec streaming
 def generate_recommendations_stream(prompt, temperature=0.7):
-    # Clé API DeepSeek intégrée directement dans le code
-    api_key = "sk-dd81fd6f4d5e4c168f8807b4b9b51fc9"
+    api_key = st.secrets.get("DEEPSEEK_API_KEY", None) or os.getenv("DEEPSEEK_API_KEY")
     local_client = init_analysis_client(api_key)
     if local_client is None:
-        st.warning("Clé API non configurée correctement.")
+        st.warning("Veuillez configurer votre clé API via Streamlit Secrets ou une variable d'environnement.")
         return ""
     try:
         stream = local_client.chat.completions.create(
@@ -765,7 +764,7 @@ with tab2:
                 display: inline-block;
                 margin: 10px 0;
             ">
-                💡 Recommandations Sommaires - Cliquez ici !
+                💡 Recommandations Sommaires - ci-dessous !
             </div>
         </div>
         """, unsafe_allow_html=True)
