@@ -1,4 +1,5 @@
 import streamlit as st
+import streamlit.components.v1 as components
 from openai import OpenAI
 import json
 from datetime import datetime
@@ -10,6 +11,7 @@ import plotly.express as px
 import plotly.io as pio
 import pandas as pd
 import os
+import urllib.parse
 
 # Fonction pour créer un document Word
 def make_docx(title: str, content: str) -> bytes:
@@ -23,9 +25,325 @@ def make_docx(title: str, content: str) -> bytes:
     buf.seek(0)
     return buf.getvalue()
 
+# Fonction pour exporter les scores en CSV
+def make_scores_csv(scores: dict) -> str:
+    lines = ["competence,score"]
+    for comp, score in scores.items():
+        lines.append(f"{comp},{score:.2f}")
+    return "\n".join(lines)
+
+# Directive de langue pour les réponses (Français / Wolof)
+def get_lang_directive() -> str:
+    lang = st.session_state.get('app_lang', 'Français')
+    if lang == 'Wolof':
+        # Directive simple et robuste pour forcer la langue Wolof
+        return "Réponds uniquement en Wolof (langue wolof standard du Sénégal)."
+    return "Réponds en français."
+
+# Mini-système de traduction pour l'UI (Français / Wolof)
+TRANSLATIONS = {
+    'Français': {
+        'tab_eval': "Évaluation",
+        'tab_results': "Résultats",
+        'tab_reco': "Recommandations",
+        'tab_adja': "Coach Fatoumata",
+          'app_title': "🇸🇳 Outil de Profilage entrepreneuriale",
+          'app_tagline': "Évaluez vos compétences entrepreneuriales et obtenez des recommandations personnalisées",
+          'adja_caption': "Fatoumata répond aux questions sur l'entrepreneuriat.",
+        'tab1_header': "Évaluation des Compétences",
+        'tab1_rubriques': "Rubriques d'évaluation",
+        'tab1_instruction': "Sélectionnez une rubrique puis évaluez chaque affirmation sur une échelle de 1 (Pas du tout d'accord) à 5 (Tout à fait d'accord)",
+        'progress_global': "Progression globale",
+        'sidebar_info': "📋 Informations",
+        'sidebar_name': "Nom complet",
+        'sidebar_age': "Âge",
+        'sidebar_sector': "Secteur d'activité",
+        'sidebar_sector_custom': "Secteur personnalisé",
+        'sidebar_sector_placeholder': "Saisissez votre secteur d'activité",
+        'sidebar_experience': "Expérience entrepreneuriale",
+        'sidebar_language': "Langue",
+        'questions_answered': "Questions répondues: {answered}/{total}",
+        'profile_calculated': "✅ Votre Profil a été Calculé",
+        'complete_info': "Complétez vos informations pour afficher votre profil d’entrepreneur",
+        'next_rubrique_button': "Rubrique suivante",
+        'resume_rapide': "🔎 Résumé rapide",
+        'score_global': "📈 Score Global",
+        'points_forts': "⭐ Points Forts",
+        'axes_amelioration': "⚠️ Axes d'Amélioration",
+        'delta_excellent': "Excellent!",
+        'delta_to_develop': "À développer",
+        'open_results_hint': "Pour le détail complet, ouvrez l'onglet \"📊 Résultats\".",
+        'monter': "⬆️ Monter",
+        'nav_success_heading': "🎉 Félicitations ! Votre évaluation est terminée.",
+        'nav_results_hint': "👉 Consultez maintenant l'onglet \"📊 Résultats\" pour voir votre profil détaillé",
+        'nav_reco_hint': "💡 Puis l'onglet \"💡 Recommandations\" pour obtenir des conseils personnalisés",
+        'nav_all_completed': "✅ Toutes les compétences sont évaluées !",
+        'nav_complete_personal_info': "📝 Complétez vos informations personnelles ci-dessus pour générer votre profil",
+        'nav_progress_label': "📊 Progression : {percent}%",
+        'nav_continue_eval': "🎯 Continuez à évaluer les compétences pour débloquer vos résultats",
+        'company_name_label': "Nom de l'entreprise",
+        'non_renseigne': "Non renseigné",
+        'results_header': "📊 Votre Profil Entrepreneurial",
+        'download_txt': "💾 Télécharger en TXT",
+        'download_word': "📄 Télécharger en Word",
+        'generating': "Génération en cours...",
+        'mentorat_button': "👥 Recommandations de Mentorat",
+        'financement_button': "💼 Opportunités de Financement",
+        'plan_action_90_title': "🗓️ Plan d'action 90 jours",
+        'plan_action_90_generate': "🗓️ Générer le plan 90 jours",
+        'analyse_complete_button': "🚀 Analyse Complète et Recommandations Globales",
+        'download_analysis_complete': "💾 Télécharger l'analyse complète",
+        'download_analysis_word': "Télécharger en Word (.docx)",
+        'no_resource_match': "Aucune ressource correspondante. Essayez un autre mot-clé.",
+        'journal_coaching_title': "📝 Journal de Coaching",
+        'download_journal_csv': "💾 Télécharger Journal (CSV)",
+        'journal_empty_caption': "Le journal de coaching est vide pour le moment.",
+        'adja_profile_success': "✅ Ton profil est pris en compte par Fatoumata pour des conseils personnalisés.",
+          'adja_info_prompt': "ℹ️ Pour des conseils plus personnalisés, complète l’onglet ‘Évaluation’.",
+        'goto_eval_button': "Aller à l’onglet Évaluation",
+        'goto_eval_warning': "Clique sur l’onglet ‘Évaluation’ en haut de la page pour commencer.",
+        'radar_trace_name': "Vos Compétences",
+        'score_label': "Score",
+        'footer_tool_heading': "🌍 Outil de Profilage Entrepreneurial - Sénégal",
+        'footer_tool_sub': "Développé par M-T pour accompagner les entrepreneurs sénégalais",
+        'footer_credit_by': "@Développé par Moctar TALL",
+        'footer_rights': "All Rights Reserved",
+        'footer_phone_label': "📞 Tél :",
+        'to_evaluate': "À évaluer",
+        'actions_recommandees': "🎯 Actions Recommandées",
+        'vous_etes_ici': "VOUS ÊTES ICI",
+        'local_resources_title': "📚 Ressources Locales",
+        'search_resources_placeholder': "Rechercher une ressource (ex: financement, formation, mentorat)",
+        'share_whatsapp': "Partager via WhatsApp",
+        'doc_title_financement': "Opportunités de Financement",
+        'doc_title_mentorat': "Recommandations de Mentorat",
+        'doc_title_analyse_complete': "Analyse complète & Recommandations",
+        'click_rubrique_hint': "👆 Cliquez sur une rubrique ci-dessus pour commencer l'évaluation",
+        'radar_map_title': "🕸️ Cartographie de vos compétences",
+        'heatmap_comp_title': "🔥 Heatmap des compétences",
+    },
+    'Wolof': {
+        'tab_eval': "Seetu Mën-mën yi",
+        'tab_results': "njureef",
+        'tab_reco': "Ndigël",
+        'tab_adja': "Cooc Fatoumata",
+        'app_title': "Jumtukaay bu seet profilu ëmbëru Senegaal",
+        'app_tagline': "Seet sa mën-mën ci entrepreneuriat te am ndigël yu ci sa bopp",
+        'adja_caption': "Fatoumata dees na tontu laaj yi ci entrepreneuriat rekk.",
+        'tab1_header': "Seetu Mën-mën yi",
+        'tab1_rubriques': "Lislaasu seetu",
+        'tab1_instruction': "Fal benn lislaas, te jéggal benn wax ci tegleel 1 di 5 (1: duñoo noppi, 5: noppi nopp)",
+        'progress_global': "Yéene jëm ci yenn ñaari xaal yi",
+        'sidebar_info': "📋 Say Xibaar",
+        'sidebar_name': "Sa Tur",
+        'sidebar_age': "Say At",
+        'sidebar_sector': "Sa Sektoru liggéey",
+        'sidebar_sector_custom': "Sektor bu sa bopp",
+        'sidebar_sector_placeholder': "Bind sektor bu sa liggéey",
+        'sidebar_experience': "Xéy ci entrepreneuriat",
+        'sidebar_language': "Kalama",
+        'questions_answered': "Laaj yi jëggalee: {answered}/{total}",
+        'profile_calculated': "✅ Sa profil bi ñu kalkule na",
+        'complete_info': "Tammal say xibaar ngir wone sa profil ëmbëru",
+        'next_rubrique_button': "Rubrik bu ci topp",
+        'resume_rapide': "🔎 Wone bu gaaw",
+        'score_global': "📈 Score Biir",
+        'points_forts': "⭐ Mën-mën yu am",
+        'axes_amelioration': "⚠️ Yoonu soppali",
+        'delta_excellent': "Baax na lool!",
+        'delta_to_develop': "Wara yokk",
+        'open_results_hint': "Ngir gëstu bu mat, ubbil \"📊 njureef\".",
+        'monter': "⬆️ Yéeg",
+        'nav_success_heading': "🎉 Jàmm rekk! Sa seetu jeex na.",
+        'nav_results_hint': "👉 Jëll ci \"📊 njureef\" ngir gis sa profil bu mat",
+        'nav_reco_hint': "💡 Ci topp, \"💡 Ndigël\" ngir am ndigël yu ci sa bopp",
+        'nav_all_completed': "✅ Mën-mën yépp ñu seet na!",
+        'nav_complete_personal_info': "📝 Tammal say xibaar ci kaw ngir génn sa profil",
+        'nav_progress_label': "📊 Yéene : {percent}%",
+        'nav_continue_eval': "🎯 Kontineel seet mën-mën yi ngir ubbi say njureef",
+        'company_name_label': "Turu ëntërpris bi",
+        'non_renseigne': "Duñu ko joxe",
+        'results_header': "📊 Sa Profil ëmbëru",
+        'download_txt': "💾 Yebal ci TXT",
+        'download_word': "📄 Yebal ci Word",
+        'generating': "Gënn ci def...",
+        'mentorat_button': "👥 Ndigël ci Mentoraat",
+        'financement_button': "💼 Jariñu Laccas",
+        'plan_action_90_title': "🗓️ Palaan 90 fan",
+        'plan_action_90_generate': "🗓️ Sos palaan 90 fan",
+        'analyse_complete_button': "🚀 Analys bu mat ak Ndigël yu bari",
+        'download_analysis_complete': "💾 Yebal analays bi",
+        'download_analysis_word': "Yebal ci Word (.docx)",
+        'no_resource_match': "Amul resurs bu japp. Jéem benn baat bu wuute.",
+        'journal_coaching_title': "📝 Jurnal bu coaching",
+        'download_journal_csv': "💾 Yebal Jurnal (CSV)",
+        'journal_empty_caption': "Jurnal bu coaching bi des na.",
+        'adja_profile_success': "✅ Fatoumata dafa jëfandikoo sa profil ngir ndigël yu ci sa bopp.",
+          'adja_info_prompt': "ℹ️ Ngir am ndigël yu gën a tekki, seetal onglet ‘Seetu’.",
+        'goto_eval_button': "Dellu ci onglet ‘Seetu’",
+        'goto_eval_warning': "Seetu onglet ‘Seetu’ ci kaw bi ngir tàmbalee.",
+        'radar_trace_name': "Sa Mën‑mën yi",
+        'score_label': "Njaaxum",
+        'footer_tool_heading': "🌍 Jumtukaay seetu ëmbëru - Senegaal",
+        'footer_tool_sub': "Defu ko M‑T ngir tàllal ëmbëru Senegaal",
+        'footer_credit_by': "@Moctar TALL moo ko def",
+        'footer_rights': "Droit yëpp mooy moom",
+        'footer_phone_label': "📞 Téléfoon :",
+        'to_evaluate': "Ñaata laaj nga koy jéggal",
+        'actions_recommandees': "🎯 Jëf yi ñu jox ndigël",
+        'vous_etes_ici': "FOO NEKK",
+        'local_resources_title': "📚 Resurs yu dëkk",
+        'search_resources_placeholder': "Seet benn resurs (misaal: laccas, jàng, mentoraat)",
+        'share_whatsapp': "Sédd ci WhatsApp",
+        'doc_title_financement': "Jariñu Laccas",
+        'doc_title_mentorat': "Ndigël ci Mentoraat",
+        'doc_title_analyse_complete': "Analys bu mat ak Ndigël",
+        'click_rubrique_hint': "👆 Bësal benn rubrik ci kaw ngir tàmbalee seetu",
+        'radar_map_title': "🕸️ Kaarti sa mën‑mën yi",
+        'heatmap_comp_title': "🔥 Màppu‑xeetu mën‑mën yi",
+    }
+}
+
+# Libellés Wolof pour les compétences (affichage)
+COMP_LABELS = {
+    'Français': {
+        "Leadership": "Leadership",
+        "Gestion & Délégation": "Gestion & Délégation",
+        "Créativité & Innovation": "Créativité & Innovation",
+        "Réseautage & Relations": "Réseautage & Relations",
+        "Résilience & Persévérance": "Résilience & Persévérance",
+        "Gestion Financière": "Gestion Financière",
+    },
+    'Wolof': {
+        "Leadership": "Jiitu",
+        "Gestion & Délégation": "Toppatoo & Jox Njël",
+        "Créativité & Innovation": "Yëngu‑yëng & Yeesal",
+        "Réseautage & Relations": "Jokkoo & Jàppante",
+        "Résilience & Persévérance": "Muñ & Tëxë",
+        "Gestion Financière": "Toppatoo Laccas",
+    }
+}
+
+# Traductions Wolof des questions par rubrique (ordre synchronisé avec COMPETENCES)
+COMP_QUESTIONS_TRANSLATIONS = {
+    'Wolof': {
+        "Leadership": [
+            "Damay tàmbali lu ëpp ci njëw gi",
+            "Xam naa ni laa taxawale ñépp te may leen xéy",
+            "Damay wone sama seen te woyof te doxlu",
+            "Xam naa naari dëgg yu metti te def na ko",
+            "Damay jox liggéeykat ñu njël te may leen bokk sañ-sañ",
+            "Damay wër jàmm te jàppantoo fax ci yéngu‑yëngu"
+        ],
+        "Gestion & Délégation": [
+            "Damay jox sañ-sañ liggéey yi ci sama équipe bu yomb",
+            "Damay gëm ñeneen ngir jëfandikoo liggéey yu am solo",
+            "Xam naa toppatoo ak plaani bu wér",
+            "Mën naa sàmm ay poroje yu bari ci benn jam",
+            "Damay setal lu jiitu ak jamono yu jeex",
+            "Damay teggle yoon yu topp ngir sàmm jeeg ak yéene"
+        ],
+        "Créativité & Innovation": [
+            "Damay génné xalaat yu bees bu yomb",
+            "Begg naa seet yoon yu bees te jéem",
+            "Damay tere xaalis bu nekkoon te lajj status quo",
+            "Mën naa xool yoon yu am jariñu",
+            "Damay suññ xalaat te jëfandikoo ko ci jëf yi",
+            "Damay xool marse bi te jàpp ci gaaw ngir soppi xalaat yi"
+        ],
+        "Réseautage & Relations": [
+            "Damay def jàppante yu liggéey bu yomb",
+            "Damay sàmm benn réseau bu di dox ci jamono",
+            "Damay jëfandikoo sama réseau ngir yenn xél yi",
+            "Damay bokk ci mbootal yi ak waa mbir yu bari",
+            "Damay sàmm jàppante bu yor yàgg",
+            "Damay def ay parteneer yi bare jariñu ci ñaari bañ"
+        ],
+        "Résilience & Persévérance": [
+            "Damay tekki te muñ ci gàddaay yi",
+            "Damay dëgër ci yéene yu yàgg",
+            "Soo toppoo ma dafañu tax ma dellu gaaw gannaaw li moye",
+            "Damay wër lu baax ci xaalis yu metti",
+            "Damay sàmm naqar te wér-góor ci dëgg‑dëgg",
+            "Damay soppi palaan bi ci jamono bu xëtul te tëgg xéy yi"
+        ],
+        "Gestion Financière": [
+            "Xam naa xew-xew yi ci wàll laccas bu yomb",
+            "Mën naa topp sa ñoom laccas ak bidget bu wér",
+            "Mën naa seet yoon ngir am laccas",
+            "Damay taxawal ci wàll laccas ak xam-xam",
+            "Mën naa plaani cash‑flow ci digg‑bopp",
+            "Mën naa teg leppi ci naqar bu jariñu te kenn di ko jënd"
+        ]
+    }
+}
+
+def tr_question(comp_name: str, index: int, default: str) -> str:
+    """Retourne la question localisée selon la rubrique et l'index."""
+    lang = st.session_state.get('app_lang', 'Français')
+    if lang == 'Wolof':
+        try:
+            return COMP_QUESTIONS_TRANSLATIONS['Wolof'][comp_name][index]
+        except Exception:
+            return default
+    return default
+
+def tr_comp(comp_name: str) -> str:
+    lang = st.session_state.get('app_lang', 'Français')
+    return COMP_LABELS.get(lang, COMP_LABELS['Français']).get(comp_name, comp_name)
+
+def tr(key: str) -> str:
+    """Retourne la traduction selon la langue choisie, avec fallback FR."""
+    lang = st.session_state.get('app_lang', 'Français')
+    return TRANSLATIONS.get(lang, TRANSLATIONS['Français']).get(key, TRANSLATIONS['Français'].get(key, key))
+
+# Définir la langue par défaut sur Français si non choisie
+if 'app_lang' not in st.session_state:
+    st.session_state['app_lang'] = 'Français'
+
+# Mini référentiel de ressources locales (Sénégal)
+LOCAL_RESOURCES = [
+    {
+        "name": "DER/FJ",
+        "tags": ["financement", "accompagnement", "incubation", "jeunes", "femmes"],
+        "description": "Délégation générale à l’Entrepreneuriat Rapide des Femmes et des Jeunes — financement, incubation, appui aux jeunes et femmes.",
+        "link": "https://der.sn"
+    },
+    {
+        "name": "APIX",
+        "tags": ["investissement", "formalisation", "guichet unique"],
+        "description": "Promotion des investissements et guichet unique pour création d’entreprise.",
+        "link": "https://apix.sn"
+    },
+    {
+        "name": "ADEPME",
+        "tags": ["PME", "accompagnement", "formation"],
+        "description": "Agence de Développement pour les PME — accompagnement, diagnostics et formation.",
+        "link": "https://adepme.sn"
+    },
+    {
+        "name": "ANPEJ",
+        "tags": ["emploi", "jeunes", "formation", "stages"],
+        "description": "Agence Nationale pour l'Emploi des Jeunes — formations, stages, dispositifs d’insertion.",
+        "link": "https://anpej.sn"
+    },
+    {
+        "name": "CBAO / Attijariwafa — Daaray Jàmbaar Yi",
+        "tags": ["mentorat", "formation", "financement", "réseau"],
+        "description": "Centre d’accompagnement avec mentorat pro, formations et facilitation d’accès au financement.",
+        "link": "https://cbao.sn"
+    },
+    {
+        "name": "Bourse Nationale de l’Emploi",
+        "tags": ["emploi", "plateforme", "jeunes"],
+        "description": "Plateforme d’offres d’emploi et d’opportunités pour les jeunes.",
+        "link": "https://bne.sn"
+    },
+]
+
 # Configuration de la page
 st.set_page_config(
-    page_title="Profilage Entrepreneur Sénégalais",
+    page_title=tr('app_title'),
     page_icon="🚀",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -143,6 +461,7 @@ def generate_recommendations_stream(prompt, temperature=0.7):
             model="deepseek-chat",
             messages=[
                 {"role": "system", "content": "Tu es un expert en entrepreneuriat et en développement des compétences entrepreneuriales au Sénégal. Tu fournis des analyses précises et des recommandations personnalisées."},
+                {"role": "system", "content": get_lang_directive()},
                 {"role": "user", "content": prompt}
             ],
             temperature=temperature,
@@ -159,8 +478,8 @@ def generate_recommendations_stream(prompt, temperature=0.7):
         st.error(f"Erreur lors de la génération des recommandations: {str(e)}")
         return ""
 
-# Chat Conseiller Adja (restriction au domaine entrepreneuriat)
-def adja_chat_stream(chat_history, temperature=0.7):
+# Chat Coach Fatoumata (restriction au domaine entrepreneuriat)
+def fatoumata_chat_stream(chat_history, temperature=0.7):
     api_key = st.secrets.get("deepseek_api_key") or os.environ.get("DEEPSEEK_API_KEY")
     local_client = init_analysis_client(api_key)
     if local_client is None:
@@ -169,17 +488,17 @@ def adja_chat_stream(chat_history, temperature=0.7):
     system_persona = {
         "role": "system",
         "content": (
-            "Tu es Adja, conseillère en entrepreneuriat au Sénégal. "
+            "Tu es Fatoumata, Coach en entrepreneuriat au Sénégal. "
             "Tu réponds uniquement aux questions liées à l'entrepreneuriat: création, gestion, financement, marketing, stratégie, "
             "opérations, leadership, juridique, fiscalité, et ressources locales. "
             "Si une question est hors de ce domaine, réponds seulement: "
-            "\"Je suis conseillère en entrepreneuriat. Reformule ta question dans ce domaine.\" "
+            "\"Je suis Coach en entrepreneuriat. Reformule ta question dans ce domaine.\" "
             "Sois claire, concrète et adaptée au contexte sénégalais. "
             "Si le profil de l'utilisateur est disponible, base tes conseils dessus."
         ),
     }
     # Injecter le contexte du profil si disponible, sinon inviter à compléter l'évaluation
-    messages = [system_persona]
+    messages = [system_persona, {"role": "system", "content": get_lang_directive()}]
     if st.session_state.get('profil_calcule', False):
         scores = st.session_state.get('scores', {})
         nom = st.session_state.get('nom', 'Non renseigné')
@@ -221,7 +540,7 @@ def adja_chat_stream(chat_history, temperature=0.7):
                 placeholder.markdown(response_text)
         return response_text
     except Exception as e:
-        st.error(f"Erreur lors du chat avec Adja: {str(e)}")
+        st.error(f"Erreur lors du chat avec Fatoumata: {str(e)}")
         return ""
 
 # Définition des compétences
@@ -316,10 +635,10 @@ def creer_diagramme_radar(scores):
         r=valeurs,
         theta=categories,
         fill='toself',
-        name='Vos Compétences',
+        name=tr('radar_trace_name'),
         line=dict(color='rgba(102, 126, 234, 0.8)', width=1.5),
         fillcolor='rgba(102, 126, 234, 0.35)',
-        hovertemplate='<b>%{theta}</b><br>Score: %{r:.2f}/5<extra></extra>'
+        hovertemplate=f'<b>%{{theta}}</b><br>{tr("score_label")}: %{{r:.2f}}/5<extra></extra>'
     ))
 
     # Supprime la ligne horizontale au milieu pour éviter de cacher des libellés
@@ -350,44 +669,97 @@ def creer_diagramme_radar(scores):
     return fig
 
 # Interface principale
-st.title("🚀 Outil de Profilage d'Entrepreneur Sénégalais")
-st.markdown("### Évaluez vos compétences entrepreneuriales et obtenez des recommandations personnalisées")
+st.title("🚀 " + tr('app_title'))
+st.markdown("### " + tr('app_tagline'))
 
 # Sidebar pour les informations
 with st.sidebar:
-    st.header("📋 Informations")
-    nom = st.text_input("Nom complet", key="nom_input")
-    age = st.number_input("Âge", min_value=18, max_value=100, value=30)
+    st.header(tr('sidebar_info'))
+    nom = st.text_input(tr('sidebar_name'), key="nom_input")
+    age = st.number_input(tr('sidebar_age'), min_value=18, max_value=100, value=30)
     secteur_options = [
         "Agriculture", "Commerce", "Services", "Technologie",
         "Artisanat", "Transport", "Éducation", "Santé"
     ]
+    # Labels Wolof pour les secteurs (affichage), valeurs internes restent en Français
+    SECTOR_LABELS = {
+        'Français': {
+            "Agriculture": "Agriculture",
+            "Commerce": "Commerce",
+            "Services": "Services",
+            "Technologie": "Technologie",
+            "Artisanat": "Artisanat",
+            "Transport": "Transport",
+            "Éducation": "Éducation",
+            "Santé": "Santé",
+            "Autre (personnalisé)": "Autre (personnalisé)",
+        },
+        'Wolof': {
+            "Agriculture": "Naat",
+            "Commerce": "Njënd",
+            "Services": "Sarwiis",
+            "Technologie": "Teknoloosi",
+            "Artisanat": "Artisanaa",
+            "Transport": "Transpór",
+            "Éducation": "Jàng",
+            "Santé": "Wér‑góor",
+            "Autre (personnalisé)": "Beneen (sa bopp)",
+        }
+    }
+    def tr_sector(opt: str) -> str:
+        lang = st.session_state.get('app_lang', 'Français')
+        return SECTOR_LABELS.get(lang, {}).get(opt, opt)
+
     secteur_choice = st.selectbox(
-        "Secteur d'activité",
+        tr('sidebar_sector'),
         secteur_options + ["Autre (personnalisé)"],
         key="secteur_select",
+        format_func=tr_sector,
     )
     if secteur_choice == "Autre (personnalisé)":
         secteur = st.text_input(
-            "Secteur personnalisé",
+            tr('sidebar_sector_custom'),
             key="secteur_custom",
-            placeholder="Saisissez votre secteur d'activité",
+            placeholder=tr('sidebar_sector_placeholder'),
         )
     else:
         secteur = secteur_choice
 
-    experience = st.selectbox("Expérience entrepreneuriale", [
+    # Labels Wolof pour l'expérience (affichage), valeurs internes restent en Français
+    EXPERIENCE_OPTIONS = [
         "Aucune", "Moins de 1 an", "1-3 ans", "3-5 ans", "Plus de 5 ans"
-    ])
+    ]
+    EXPERIENCE_LABELS = {
+        'Français': {
+            "Aucune": "Aucune",
+            "Moins de 1 an": "Moins de 1 an",
+            "1-3 ans": "1-3 ans",
+            "3-5 ans": "3-5 ans",
+            "Plus de 5 ans": "Plus de 5 ans",
+        },
+        'Wolof': {
+            "Aucune": "Dara",
+            "Moins de 1 an": "Suul 1 at",
+            "1-3 ans": "1–3 at",
+            "3-5 ans": "3–5 at",
+            "Plus de 5 ans": "Lu ëpp 5 at",
+        }
+    }
+    def tr_experience(opt: str) -> str:
+        lang = st.session_state.get('app_lang', 'Français')
+        return EXPERIENCE_LABELS.get(lang, {}).get(opt, opt)
+
+    experience = st.selectbox(tr('sidebar_experience'), EXPERIENCE_OPTIONS, format_func=tr_experience)
+    st.selectbox(tr('sidebar_language'), ["Français", "Wolof"], index=0, key="app_lang")
     # (Champ clé API supprimé)
     
     # Signature
     st.markdown("---")
-    st.markdown("""
+    st.markdown(f"""
     <div style='text-align: center; font-size: 0.8em; color: #666;'>
-        <p><strong>@Développé par Moctar TALL</strong><br>
-        All Rights Reserved<br>
-        📞 Tél : 77 359 15 09</p>
+        <p><strong>{tr('footer_credit_by')}</strong><br>
+        {tr('footer_rights')}<br>
+        {tr('footer_phone_label')} 77 359 15 09</p>
     </div>
     """, unsafe_allow_html=True)
 
@@ -504,12 +876,12 @@ evaluation_complete = st.session_state.get('profil_calcule', False)
 results_available = evaluation_complete
 recommendations_available = evaluation_complete
 
-# Créer les labels des onglets avec indicateurs
-tab1_label = "📝 Évaluation"
+# Créer les labels des onglets avec indicateurs (localisés)
+tab1_label = "📝 " + tr('tab_eval')
 if evaluation_complete:
     tab1_label += " ✅"
 
-tab2_label = "📊 Résultats"
+tab2_label = "📊 " + tr('tab_results')
 if results_available:
     tab2_label += " ✅"
 elif evaluation_complete:
@@ -517,7 +889,7 @@ elif evaluation_complete:
 else:
     tab2_label += " 🔒"
 
-tab3_label = "💡 Recommandations"
+tab3_label = "💡 " + tr('tab_reco')
 if recommendations_available:
     tab3_label += " ✅"
 elif evaluation_complete:
@@ -526,19 +898,24 @@ else:
     tab3_label += " 🔒"
 
 # Tabs pour l'interface avec labels améliorés
-tab4_label = "👩🏾‍💼 Conseiller Adja"
+tab4_label = "👩🏾‍💼 " + tr('tab_adja')
 tab1, tab2, tab3, tab4 = st.tabs([tab1_label, tab2_label, tab3_label, tab4_label])
 
 with tab1:
-    st.header("Évaluation des Compétences")
-    st.markdown("*Sélectionnez une rubrique puis évaluez chaque affirmation sur une échelle de 1 (Pas du tout d'accord) à 5 (Tout à fait d'accord)*")
+    st.header(tr('tab1_header'))
+    st.markdown("*" + tr('tab1_instruction') + "*")
+    # Barre de progression globale
+    total_questions = sum(len(data["questions"]) for data in COMPETENCES.values())
+    answered_questions = sum(1 for comp, data in COMPETENCES.items() for i in range(len(data["questions"])) if st.session_state.get(f"{comp}_{i}") is not None)
+    progress_ratio = (answered_questions / total_questions) if total_questions else 0
+    st.progress(progress_ratio, text=f"{tr('progress_global')}: {progress_ratio*100:.0f}%")
     
     # Interface avec rubriques cliquables
     if 'selected_competence' not in st.session_state:
         st.session_state.selected_competence = None
     
     # Affichage des rubriques en ligne
-    st.subheader("📋 Rubriques d'évaluation")
+    st.subheader("📋 " + tr('tab1_rubriques'))
     
 
     
@@ -557,10 +934,10 @@ with tab1:
             # Déterminer le style et le texte du bouton
             # Vert (primary) uniquement si complétée, sinon neutre (secondary)
             if is_completed:
-                button_text = f"{competence}"
+                button_text = f"{tr_comp(competence)}"
                 button_style = "primary"
             else:
-                button_text = f"🎯 {competence}"
+                button_text = f"🎯 {tr_comp(competence)}"
                 button_style = "secondary"
             
             if st.button(
@@ -581,7 +958,7 @@ with tab1:
         selected_comp = st.session_state.selected_competence
         
         # Titre de la rubrique sélectionnée (plus compact)
-        st.subheader(f"🎯 {selected_comp}")
+        st.subheader(f"🎯 {tr_comp(selected_comp)}")
         
         # Questions de la rubrique sélectionnée (format compact)
         with st.container():
@@ -594,7 +971,7 @@ with tab1:
                 col_question, col_buttons = st.columns([3, 2])
                 
                 with col_question:
-                    st.write(f"**{i+1}.** {question}")
+                    st.write(f"**{i+1}.** {tr_question(selected_comp, i, question)}")
                 
                 with col_buttons:
                     cols_nums = st.columns(5)
@@ -616,10 +993,10 @@ with tab1:
                 if selected is not None:
                     st.caption(f"✅ {selected}/5")
                 else:
-                    st.caption("⏳ À évaluer")
+                    st.caption("⏳ " + tr('to_evaluate'))
     
     else:
-        st.info("👆 Cliquez sur une rubrique ci-dessus pour commencer l'évaluation")
+        st.info(tr('click_rubrique_hint'))
     
     # Calcul des scores pour toutes les compétences
     scores = {}
@@ -667,7 +1044,7 @@ with tab1:
         # Affichage du statut de completion
         col1, col2, col3 = st.columns(3)
         with col2:
-            st.markdown("""
+            st.markdown(f"""
             <div style="
                 background: linear-gradient(135deg, #28a745, #20c997);
                 color: white;
@@ -677,7 +1054,7 @@ with tab1:
                 font-weight: bold;
                 box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
             ">
-                ✅ Votre Profil a été Calculé
+                {tr('profile_calculated')}
             </div>
             """, unsafe_allow_html=True)
     else:
@@ -691,7 +1068,7 @@ with tab1:
                                    if st.session_state.get(f"{competence}_{i}") is not None)
             
             # Calcul du pourcentage de progression basé sur les questions répondues
-            progress_text = f"Questions répondues: {answered_questions}/{total_questions}"
+            progress_text = tr('questions_answered').format(answered=answered_questions, total=total_questions)
             progress_percent = (answered_questions / total_questions) * 100 if total_questions > 0 else 0
             
             st.markdown(f"""
@@ -704,7 +1081,7 @@ with tab1:
                 text-align: center;
                 font-weight: bold;
             ">
-                🔄 Complétez vos informations pour afficher votre profil d’entrepreneur<br>
+                🔄 {tr('complete_info')}<br>
                 <small>{progress_text}</small><br>
                 <div style="background: #e9ecef; border-radius: 10px; height: 8px; margin: 10px 0;">
                     <div style="background: #007bff; height: 100%; width: {progress_percent}%; border-radius: 10px;"></div>
@@ -714,7 +1091,7 @@ with tab1:
     with col3:
         # Afficher le bouton "Rubrique suivante" seulement si une rubrique est sélectionnée ET qu'il reste des rubriques incomplètes
         if st.session_state.get('selected_competence') and not all_competences_completed():
-            if st.button("Rubrique suivante", key="btn_next_rubrique", type="secondary", use_container_width=True):
+            if st.button(tr('next_rubrique_button'), key="btn_next_rubrique", type="secondary", use_container_width=True):
                 target = next_uncompleted_competence(st.session_state.get('selected_competence'))
                 if target:
                     st.session_state.selected_competence = target
@@ -724,24 +1101,24 @@ with tab1:
                         st.experimental_rerun()
     # Résumé rapide directement sous le bouton pour éviter de remonter
     if st.session_state.get('profil_calcule'):
-        st.markdown("### 🔎 Résumé rapide")
+        st.markdown("### " + tr('resume_rapide'))
         profil, description, couleur, moyenne = calculer_profil(st.session_state.scores)
         c1, c2, c3 = st.columns(3)
         with c1:
-            st.metric("📈 Score Global", f"{moyenne:.2f}/5")
+            st.metric(tr('score_global'), f"{moyenne:.2f}/5")
         with c2:
             st.markdown(f"<div style='text-align: center; padding: 12px; background: {couleur}22; border-radius: 8px; border-left: 4px solid {couleur}'><b style='color: {couleur}'>{profil}</b></div>", unsafe_allow_html=True)
         with c3:
             pf = sum(1 for s in st.session_state.scores.values() if s >= 4.0)
-            st.metric("⭐ Points Forts", f"{pf}/{len(st.session_state.scores)}")
+            st.metric(tr('points_forts'), f"{pf}/{len(st.session_state.scores)}")
         # Mini-diagramme
         st.plotly_chart(creer_diagramme_radar(st.session_state.scores), use_container_width=True, key="radar_summary_tab1")
         # Info + lien de remontée
         cInfo, cBtn = st.columns([3, 1])
         with cInfo:
-            st.info("Pour le détail complet, ouvrez l'onglet \"📊 Résultats\".")
+            st.info(tr('open_results_hint'))
         with cBtn:
-            st.markdown("""
+            st.markdown(f"""
             <div style="
                 background: linear-gradient(135deg, #007bff, #0056b3);
                 color: white;
@@ -752,45 +1129,45 @@ with tab1:
                 transition: all 0.3s ease;
             ">
                 <a href='#haut-de-page' style='color: white; text-decoration: none; font-weight: 600;'>
-                    ⬆️ Monter
+                    {tr('monter')}
                 </a>
             </div>
             """, unsafe_allow_html=True)
     
     # Message de navigation pour guider l'utilisateur
     if st.session_state.get('profil_calcule'):
-        st.markdown("""
+        st.markdown(f"""
         <div class="navigation-hint">
-            🎉 <strong>Félicitations ! Votre évaluation est terminée.</strong><br>
-            👉 Consultez maintenant l'onglet <strong>"📊 Résultats"</strong> pour voir votre profil détaillé<br>
-            💡 Puis l'onglet <strong>"💡 Recommandations"</strong> pour obtenir des conseils personnalisés
+            {tr('nav_success_heading')}<br>
+            {tr('nav_results_hint')}<br>
+            {tr('nav_reco_hint')}
         </div>
         """, unsafe_allow_html=True)
     elif all_competences_completed():
-        st.markdown("""
+        st.markdown(f"""
         <div class="navigation-hint">
-            ✅ <strong>Toutes les compétences sont évaluées !</strong><br>
-            📝 Complétez vos informations personnelles ci-dessus pour générer votre profil
+            {tr('nav_all_completed')}<br>
+            {tr('nav_complete_personal_info')}
         </div>
         """, unsafe_allow_html=True)
     else:
         progress_percent = (sum(1 for comp in COMPETENCES.keys() if is_competence_completed(comp)) / len(COMPETENCES)) * 100
         st.markdown(f"""
         <div class="navigation-hint">
-            📊 <strong>Progression : {progress_percent:.0f}%</strong><br>
-            🎯 Continuez à évaluer les compétences pour débloquer vos résultats
+            {tr('nav_progress_label').format(percent=f"{progress_percent:.0f}")}<br>
+            {tr('nav_continue_eval')}
         </div>
         """, unsafe_allow_html=True)
 
 with tab2:
     if 'profil_calcule' in st.session_state and st.session_state.profil_calcule:
         scores = st.session_state.scores
-        nom = st.session_state.get('nom', 'Non renseigné')
+        nom = st.session_state.get('nom', tr('non_renseigne'))
         
         # Saisie optionnelle du nom de l'entreprise
-        st.text_input("Nom de l'entreprise", key="entreprise_tab3")
+        st.text_input(tr('company_name_label'), key="entreprise_tab3")
         
-        st.header("📊 Votre Profil Entrepreneurial")
+        st.header(tr('results_header'))
         
         profil, description, couleur, moyenne = calculer_profil(scores)
         
@@ -798,21 +1175,53 @@ with tab2:
         col1, col2, col3 = st.columns(3)
         
         with col1:
-            st.metric("📈 Score Global", f"{moyenne:.2f}/5", delta="Excellent!" if moyenne >= 3.5 else "À développer")
+            st.metric(tr('score_global'), f"{moyenne:.2f}/5", delta=tr('delta_excellent') if moyenne >= 3.5 else tr('delta_to_develop'))
         
         with col2:
             st.markdown(f"<div style='text-align: center; padding: 20px; background: {couleur}22; border-radius: 10px; border-left: 5px solid {couleur}'><h3 style='color: {couleur}; margin: 0'>{profil}</h3></div>", unsafe_allow_html=True)
         
         with col3:
             points_forts = sum(1 for s in scores.values() if s >= 4.0)
-            st.metric("⭐ Points Forts", f"{points_forts}/{len(scores)}")
+            st.metric(tr('points_forts'), f"{points_forts}/{len(scores)}")
         
         st.info(f"📌 {description}")
         
         # Diagramme radar amélioré
-        st.subheader("🕸️ Cartographie de vos compétences")
+        st.subheader(tr('radar_map_title'))
         fig_radar = creer_diagramme_radar(scores)
         st.plotly_chart(fig_radar, use_container_width=True, key="radar_full_tab3")
+        
+        # 🔥 Heatmap des compétences
+        st.markdown("### " + tr('heatmap_comp_title'))
+        heatmap_fig = go.Figure(data=go.Heatmap(
+            z=[list(scores.values())],
+            x=list(scores.keys()),
+            y=[tr('score_label')],
+            colorscale='YlOrRd', zmin=0, zmax=5, showscale=True
+        ))
+        heatmap_fig.update_layout(height=180, margin=dict(l=10, r=10, t=10, b=10))
+        st.plotly_chart(heatmap_fig, use_container_width=True)
+
+        # 🏅 Badges
+        st.markdown("### 🏅 Badges")
+        badges = []
+        if moyenne >= 3.5:
+            badges.append("Excellence (Score global ≥ 3.5)")
+        if all_competences_completed():
+            badges.append("Évaluation complète")
+        if badges:
+            st.success(" | ".join([f"🏅 {b}" for b in badges]))
+        else:
+            st.info("Complétez l'évaluation pour débloquer des badges.")
+
+        # 💾 Export CSV des scores
+        st.download_button(
+            label="💾 Télécharger Scores (CSV)",
+            data=make_scores_csv(scores),
+            file_name=f"scores_{datetime.now().strftime('%Y%m%d')}.csv",
+            mime="text/csv",
+            key="dl_scores_csv"
+        )
         
         # Bouton pour recommandations sommaires - Style amélioré pour plus de visibilité
         st.markdown("""
@@ -872,7 +1281,7 @@ Sois direct, actionnable et adapté au contexte sénégalais."""
         col1, col2 = st.columns(2)
         
         with col1:
-            st.markdown("### ✅ Points Forts")
+            st.markdown("### ✅ " + tr('points_forts'))
             points_forts_list = sorted(scores.items(), key=lambda x: x[1], reverse=True)[:3]
             for i, (comp, score) in enumerate(points_forts_list, 1):
                 st.markdown(f"""
@@ -883,7 +1292,7 @@ Sois direct, actionnable et adapté au contexte sénégalais."""
                 """, unsafe_allow_html=True)
         
         with col2:
-            st.markdown("### ⚠️ Axes d'Amélioration")
+            st.markdown("### ⚠️ " + tr('axes_amelioration'))
             axes_amelioration = sorted(scores.items(), key=lambda x: x[1])[:3]
             for i, (comp, score) in enumerate(axes_amelioration, 1):
                 st.markdown(f"""
@@ -962,7 +1371,7 @@ Sois direct, actionnable et adapté au contexte sénégalais."""
                     progression = 0
                 
                 # Indicateur si c'est le niveau actuel
-                indicateur = " ← VOUS ÊTES ICI" if niveau == niveau_actuel else ""
+                indicateur = (" ← " + tr('vous_etes_ici')) if niveau == niveau_actuel else ""
                 
                 st.markdown(f"""
                 <div style="margin: 10px 0;">
@@ -983,7 +1392,7 @@ Sois direct, actionnable et adapté au contexte sénégalais."""
                 """, unsafe_allow_html=True)
         
         with col2:
-            st.markdown("### 🎯 Actions Recommandées")
+            st.markdown("### " + tr('actions_recommandees'))
             
             actions = {
                 "Débutant": "📚 Formation complète",
@@ -1066,19 +1475,18 @@ Sois direct, actionnable et adapté au contexte sénégalais."""
             )
         
         # Message de navigation vers les recommandations
-        st.markdown("""
+        st.markdown(f"""
         <div class="navigation-hint">
-            🎯 <strong>Prêt pour la suite ?</strong><br>
-            💡 Découvrez maintenant l'onglet <strong>"💡 Recommandations"</strong> pour obtenir des conseils personnalisés et un plan d'action adapté à votre profil !
+            {tr('nav_reco_hint')}
         </div>
         """, unsafe_allow_html=True)
         
     else:
-        st.info("👈 Complétez d'abord l'évaluation dans l'onglet 'Évaluation'")
+        st.info(tr('goto_eval_warning'))
 
 with tab3:
     if 'profil_calcule' in st.session_state and st.session_state.profil_calcule:
-        st.header("💡 Recommandations Personnalisées")
+        st.header("💡 " + tr('tab_reco'))
         
         scores = st.session_state.scores
         nom = st.session_state.get('nom', 'Non renseigné')
@@ -1184,9 +1592,9 @@ RESSOURCES SPÉCIFIQUES À MENTIONNER SI PERTINENTES :
         col3, col4 = st.columns(2)
         
         with col3:
-            if st.button("👥 Recommandations de Mentorat", use_container_width=True, key="mentorat"):
-                st.subheader("👥 Recommandations de Mentorat")
-                with st.spinner("Génération en cours..."):
+            if st.button(tr('mentorat_button'), use_container_width=True, key="mentorat"):
+                st.subheader(tr('mentorat_button'))
+                with st.spinner(tr('generating')):
                     prompt = f"""{contexte}
 
 Recommande un programme de mentorat adapté à cet entrepreneur sénégalais.
@@ -1206,7 +1614,7 @@ RESSOURCES SPÉCIFIQUES À MENTIONNER SI PERTINENTES :
                     col_txt, col_word = st.columns(2)
                     with col_txt:
                         st.download_button(
-                            label="💾 Télécharger en TXT",
+                            label=tr('download_txt'),
                             data=reponse_mentorat,
                             file_name=f"recommandations_mentorat_{datetime.now().strftime('%Y%m%d')}.txt",
                             mime="text/plain",
@@ -1214,16 +1622,16 @@ RESSOURCES SPÉCIFIQUES À MENTIONNER SI PERTINENTES :
                         )
                     with col_word:
                         st.download_button(
-                            label="📄 Télécharger en Word",
-                            data=make_docx("Recommandations de Mentorat", reponse_mentorat),
+                            label=tr('download_word'),
+                            data=make_docx(tr('doc_title_mentorat'), reponse_mentorat),
                             file_name=f"recommandations_mentorat_{datetime.now().strftime('%Y%m%d')}.docx",
                             mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
                             key="dl_mentorat_word"
                         )
         
         with col4:
-            if st.button("💼 Opportunités de Financement", use_container_width=True, key="financement"):
-                st.subheader("💼 Opportunités de Financement")
+            if st.button(tr('financement_button'), use_container_width=True, key="financement"):
+                st.subheader(tr('financement_button'))
                 with st.spinner("Génération en cours..."):
                     prompt = f"""{contexte}
 
@@ -1244,7 +1652,7 @@ RESSOURCES SPÉCIFIQUES À MENTIONNER SI PERTINENTES :
                     col_txt, col_word = st.columns(2)
                     with col_txt:
                         st.download_button(
-                            label="💾 Télécharger en TXT",
+                            label=tr('download_txt'),
                             data=reponse_financement,
                             file_name=f"opportunites_financement_{datetime.now().strftime('%Y%m%d')}.txt",
                             mime="text/plain",
@@ -1252,19 +1660,74 @@ RESSOURCES SPÉCIFIQUES À MENTIONNER SI PERTINENTES :
                         )
                     with col_word:
                         st.download_button(
-                            label="📄 Télécharger en Word",
-                            data=make_docx("Opportunités de Financement", reponse_financement),
+                            label=tr('download_word'),
+                            data=make_docx(tr('doc_title_financement'), reponse_financement),
                             file_name=f"opportunites_financement_{datetime.now().strftime('%Y%m%d')}.docx",
                             mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
                             key="dl_financement_word"
                         )
+
+        # 🗓️ Plan d'action 90 jours
+        st.markdown("### " + tr('plan_action_90_title'))
+        col_plan1, col_plan2 = st.columns([2, 1])
+        with col_plan1:
+            if st.button(tr('plan_action_90_generate'), use_container_width=True, key="plan_90"):
+                st.subheader(tr('plan_action_90_title'))
+                with st.spinner(tr('generating')):
+                    prompt = f"""{contexte}
+
+En tant que conseiller en entrepreneuriat au Sénégal, crée un plan d'action structuré sur 90 jours:
+- Semaines 1-4: Actions immédiates (marketing, opérations, finances)
+- Semaines 5-8: Consolidation (processus, équipe, partenariats)
+- Semaines 9-12: Évaluation et ajustement
+
+Inclure: objectifs mesurables, tâches concrètes, indicateurs de succès, et ressources locales pertinentes.
+"""
+                    reponse_plan = generate_recommendations_stream(prompt)
+                    st.session_state['plan_90_text'] = reponse_plan
+        with col_plan2:
+            if st.session_state.get('plan_90_text'):
+                encoded = urllib.parse.quote(st.session_state['plan_90_text'])
+                st.markdown(f"[{tr('share_whatsapp')}](https://wa.me/?text={encoded})")
+                st.download_button(
+                    label=tr('download_txt'),
+                    data=st.session_state['plan_90_text'],
+                    file_name=f"plan_90_jours_{datetime.now().strftime('%Y%m%d')}.txt",
+                    mime="text/plain",
+                    key="dl_plan90_txt"
+                )
+                st.download_button(
+                    label=tr('download_word'),
+                    data=make_docx(tr('plan_action_90_title'), st.session_state['plan_90_text']),
+                    file_name=f"plan_90_jours_{datetime.now().strftime('%Y%m%d')}.docx",
+                    mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                    key="dl_plan90_docx"
+                )
+
+        # 📚 Ressources Locales (Recherche)
+        st.markdown("### " + tr('local_resources_title'))
+        query = st.text_input(tr('search_resources_placeholder'), key="search_resources")
+        def match_res(r, q):
+            q = q.lower()
+            return (
+                q in r["name"].lower() or
+                any(q in t.lower() for t in r["tags"]) or
+                q in r["description"].lower()
+            )
+        filtered = LOCAL_RESOURCES if not query or not query.strip() else [r for r in LOCAL_RESOURCES if match_res(r, query.strip())]
+        for r in filtered:
+            link = f" [Lien]({r['link']})" if r.get('link') else ""
+            tags = ", ".join(r["tags"]) if r.get("tags") else ""
+            st.markdown(f"- **{r['name']}** — {r['description']} ({tags}){link}")
+        if not filtered:
+            st.info(tr('no_resource_match'))
         
         st.markdown("---")
         
         # Analyse complète
-        if st.button("🚀 Analyse Complète et Recommandations Globales", type="primary", use_container_width=True):
-            st.subheader("🚀 Analyse Complète et Recommandations Globales")
-            with st.spinner("Analyse approfondie en cours..."):
+        if st.button(tr('analyse_complete_button'), type="primary", use_container_width=True):
+            st.subheader(tr('analyse_complete_button'))
+            with st.spinner(tr('generating')):
                 prompt = f"""{contexte}
 
 En tant qu'expert en entrepreneuriat au Sénégal, fournis une analyse complète et des recommandations globales pour cet entrepreneur.
@@ -1306,39 +1769,92 @@ Sois concret, actionnable et adapté au contexte sénégalais."""
                 
                 # Option de téléchargement
                 st.download_button(
-                    label="💾 Télécharger l'analyse complète",
+                    label=tr('download_analysis_complete'),
                     data=reponse,
                     file_name=f"analyse_complete_{datetime.now().strftime('%Y%m%d')}.txt",
                     mime="text/plain"
                 )
                 st.download_button(
-                    label="Télécharger en Word (.docx)",
-                    data=make_docx("Analyse complète & Recommandations", reponse),
+                    label=tr('download_analysis_word'),
+                    data=make_docx(tr('doc_title_analyse_complete'), reponse),
                     file_name=f"analyse_complete_{datetime.now().strftime('%Y%m%d')}.docx",
                     mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
                 )
 
 # Footer
 with tab4:
-    st.header("👩🏾‍💼 Conseiller Adja")
-    st.caption("Adja répond uniquement aux questions d’entrepreneuriat.")
-    if 'adja_chat' not in st.session_state:
-        st.session_state['adja_chat'] = [
-            {"role": "assistant", "content": "Bonjour, je suis Adja, conseillère en entrepreneuriat au Sénégal. Pose ta question liée à l’entrepreneuriat."}
-        ]
-    for msg in st.session_state['adja_chat']:
+    st.header("👩🏾‍💼 " + tr('tab_adja'))
+    st.caption(tr('adja_caption'))
+    if 'coaching_journal' not in st.session_state:
+        st.session_state['coaching_journal'] = []
+    if 'fatoumata_chat' not in st.session_state:
+        # Message d’accueil selon la langue
+        lang = st.session_state.get('app_lang', 'Français')
+        if lang == 'Wolof':
+            welcome = "Salaamaleekum, Cooc Fatoumata laa. Ci entrepreneuriat ci Senegaal laa. Laaj sa laaj bu jëm ci entrepreneuriat."
+        else:
+            welcome = "Bonjour, je suis Coach Fatoumata, spécialisée en entrepreneuriat au Sénégal. Pose ta question liée à l’entrepreneuriat."
+        st.session_state['fatoumata_chat'] = [{"role": "assistant", "content": welcome}]
+    for msg in st.session_state['fatoumata_chat']:
         st.chat_message(msg["role"]).markdown(msg["content"])
-    user_msg = st.chat_input("Pose ta question sur l’entrepreneuriat")
+    # Placeholder de saisi selon la langue
+    lang = st.session_state.get('app_lang', 'Français')
+    placeholder = "Pose ta question sur l’entrepreneuriat" if lang == 'Français' else "Laaj sa laaj ci entrepreneuriat"
+    user_msg = st.chat_input(placeholder)
     if user_msg:
-        st.session_state['adja_chat'].append({"role": "user", "content": user_msg})
+        st.session_state['fatoumata_chat'].append({"role": "user", "content": user_msg})
         with st.chat_message("assistant"):
-            response = adja_chat_stream(st.session_state['adja_chat'])
-        st.session_state['adja_chat'].append({"role": "assistant", "content": response})
+            response = fatoumata_chat_stream(st.session_state['fatoumata_chat'])
+        st.session_state['fatoumata_chat'].append({"role": "assistant", "content": response})
+        st.session_state['coaching_journal'].append({
+            "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M"),
+            "question": user_msg,
+            "reponse": response
+        })
+
+    # Rappel de statut sous le chat
+    st.markdown("---")
+    if st.session_state.get('profil_calcule'):
+        st.success(tr('adja_profile_success'))
+    else:
+        st.info(tr('adja_info_prompt'))
+        if st.button(tr('goto_eval_button'), key="goto_eval_button"):
+            components.html("""
+            <script>
+            (function() {
+              const doc = window.parent.document;
+              const buttons = doc.querySelectorAll('button[role="tab"]');
+              if (buttons && buttons.length > 0) {
+                buttons[0].click();
+                return;
+              }
+              const divs = doc.querySelectorAll('div[role="tab"]');
+              if (divs && divs.length > 0) {
+                divs[0].click();
+              }
+            })();
+            </script>
+            """, height=0)
+
+    # Journal de coaching
+    st.markdown("### " + tr('journal_coaching_title'))
+    if st.session_state['coaching_journal']:
+        df_journal = pd.DataFrame(st.session_state['coaching_journal'])
+        st.dataframe(df_journal, use_container_width=True, hide_index=True)
+        st.download_button(
+            label=tr('download_journal_csv'),
+            data=df_journal.to_csv(index=False),
+            file_name=f"journal_coaching_{datetime.now().strftime('%Y%m%d')}.csv",
+            mime="text/csv",
+            key="dl_journal_csv"
+        )
+    else:
+        st.caption(tr('journal_empty_caption'))
 
 st.markdown("---")
-st.markdown("""
+st.markdown(f"""
 <div style='text-align: center'>
-    <p>🌍 Outil de Profilage Entrepreneurial - Sénégal</p>
-    <p style='font-size: 0.8em'>Développé par M-T pour accompagner les entrepreneurs sénégalais</p>
+    <p>{tr('footer_tool_heading')}</p>
+    <p style='font-size: 0.8em'>{tr('footer_tool_sub')}</p>
 </div>
 """, unsafe_allow_html=True)
