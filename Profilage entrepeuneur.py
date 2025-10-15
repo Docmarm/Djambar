@@ -317,8 +317,8 @@ LOCAL_RESOURCES = [
     },
     {
         "name": "ADEPME",
-        "tags": ["PME", "accompagnement", "formation"],
-        "description": "Agence de Développement pour les PME — accompagnement, diagnostics et formation.",
+        "tags": ["PME", "accompagnement", "diagnostics"],
+        "description": "Agence de Développement pour les PME — accompagnement et diagnostics (ne propose plus de formation).",
         "link": "https://adepme.sn"
     },
     {
@@ -326,6 +326,12 @@ LOCAL_RESOURCES = [
         "tags": ["emploi", "jeunes", "formation", "stages"],
         "description": "Agence Nationale pour l'Emploi des Jeunes — formations, stages, dispositifs d’insertion.",
         "link": "https://anpej.sn"
+    },
+    {
+        "name": "ONFP — Office National de Formation Professionnelle",
+        "tags": ["formation", "certification", "apprentissage", "professionnelle"],
+        "description": "Programmes de formation professionnelle, certifications, apprentissage technique et reconversion.",
+        "link": "https://onfp.sn"
     },
     {
         "name": "CBAO / Attijariwafa — Daaray Jàmbaar Yi",
@@ -1528,7 +1534,9 @@ Inclus:
 4. Des ressources locales (organisations, programmes, institutions sénégalaises)
 
 RESSOURCES SPÉCIFIQUES À MENTIONNER SI PERTINENTES :
-- Daaray Jàmbaar Yi (CBAO Groupe Attijariwafa bank) : centre d'accompagnement offrant formations entrepreneuriales, coaching personnalisé, aide au montage de projets, business plans, et facilitation d'accès au financement. Idéal pour initiation à l'entrepreneuriat, modules spécialisés (business model, gestion d'entreprise, éducation financière) et accompagnement des TPME/PME."""
+        - Daaray Jàmbaar Yi (CBAO Groupe Attijariwafa bank) : centre d'accompagnement offrant formations entrepreneuriales, coaching personnalisé, aide au montage de projets, business plans, et facilitation d'accès au financement. Idéal pour initiation à l'entrepreneuriat, modules spécialisés (business model, gestion d'entreprise, éducation financière) et accompagnement des TPME/PME.
+        - ONFP — Office National de Formation Professionnelle : programmes de formation professionnelle, certifications, apprentissage technique et reconversion, adaptés au développement des compétences métiers.
+        NOTE FORMATION : ADEPME n’offre plus de formation ; ne pas la recommander pour ce volet."""
                     
                     reponse_formation = generate_recommendations_stream(prompt)
                     
@@ -1757,6 +1765,10 @@ Structure ton analyse ainsi:
 
 RESSOURCE PRIORITAIRE À MENTIONNER :
 - Daaray Jàmbaar Yi (CBAO Groupe Attijariwafa bank) : centre d'accompagnement complet offrant formations entrepreneuriales, coaching personnalisé, mentorat par professionnels bancaires, aide au montage de projets et business plans, facilitation d'accès au financement, et networking avec entrepreneurs et investisseurs. Idéal pour tous profils d'entrepreneurs (jeunes porteurs de projet, TPME, PME, femmes entrepreneures).
+
+RESSOURCES FORMATION À PRIVILÉGIER :
+- ONFP — Office National de Formation Professionnelle : programmes de formation professionnelle, certifications, apprentissage technique et reconversion, adaptés au développement des compétences métiers.
+NOTE FORMATION : ADEPME n’offre plus de formation ; ne pas la recommander pour ce volet.
 
 5. **CONSEILS ADAPTÉS AU SECTEUR** ({secteur})
    - Spécificités du secteur au Sénégal
