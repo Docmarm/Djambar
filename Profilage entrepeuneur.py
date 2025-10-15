@@ -1229,31 +1229,8 @@ with tab2:
             key="dl_scores_csv"
         )
         
-        # Bouton pour recommandations sommaires - Style amélioré pour plus de visibilité
-        st.markdown("""
-        <div style="text-align: center; margin: 20px 0;">
-            <div style="
-                background: linear-gradient(135deg, #ff6b35, #f7931e);
-                color: white;
-                padding: 15px 30px;
-                border-radius: 25px;
-                font-weight: bold;
-                font-size: 18px;
-                box-shadow: 0 6px 20px rgba(255, 107, 53, 0.4);
-                border: none;
-                cursor: pointer;
-                transition: all 0.3s ease;
-                display: inline-block;
-                margin: 10px 0;
-            ">
-                💡 Recommandations Sommaires - Cliquez ci-dessous !
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
-        
-        col_rec1, col_rec2, col_rec3 = st.columns([1, 2, 1])
-        with col_rec2:
-            if st.button("💡 Recommandations Sommaires", type="primary", use_container_width=True, key="reco_sommaire_duplicate", help="Obtenez des recommandations personnalisées basées sur votre profil"):
+        # Bouton unique pleine largeur pour déclencher les recommandations sommaires
+        if st.button("💡 Recommandations Sommaires - Cliquez ici !", type="primary", use_container_width=True, key="reco_sommaire_duplicate", help="Obtenez des recommandations personnalisées basées sur votre profil"):
                 st.subheader("💡 Recommandations Personnalisées")
                 with st.spinner("Génération des recommandations en cours..."):
                     # Préparer le contexte pour l'analyse
