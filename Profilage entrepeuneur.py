@@ -132,8 +132,8 @@ def tous_formulaires_remplis(nom, secteur, experience, scores):
 
 # Fonction pour générer des recommandations avec streaming
 def generate_recommendations_stream(prompt, temperature=0.7):
-    # Clé API DeepSeek intégrée directement dans le code
-    api_key = "sk-dd81fd6f4d5e4c168f8807b4b9b51fc9"
+    # Lecture de la clé API depuis secrets.toml ou variable d'environnement
+    api_key = st.secrets.get("deepseek_api_key") or os.environ.get("DEEPSEEK_API_KEY")
     local_client = init_analysis_client(api_key)
     if local_client is None:
         st.warning("Clé API non configurée correctement.")
