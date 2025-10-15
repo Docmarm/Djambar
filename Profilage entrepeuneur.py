@@ -159,6 +159,71 @@ def generate_recommendations_stream(prompt, temperature=0.7):
         st.error(f"Erreur lors de la génération des recommandations: {str(e)}")
         return ""
 
+# Chat Conseiller Adja (restriction au domaine entrepreneuriat)
+def adja_chat_stream(chat_history, temperature=0.7):
+    api_key = st.secrets.get("deepseek_api_key") or os.environ.get("DEEPSEEK_API_KEY")
+    local_client = init_analysis_client(api_key)
+    if local_client is None:
+        st.warning("Clé API non configurée correctement.")
+        return ""
+    system_persona = {
+        "role": "system",
+        "content": (
+            "Tu es Adja, conseillère en entrepreneuriat au Sénégal. "
+            "Tu réponds uniquement aux questions liées à l'entrepreneuriat: création, gestion, financement, marketing, stratégie, "
+            "opérations, leadership, juridique, fiscalité, et ressources locales. "
+            "Si une question est hors de ce domaine, réponds seulement: "
+            "\"Je suis conseillère en entrepreneuriat. Reformule ta question dans ce domaine.\" "
+            "Sois claire, concrète et adaptée au contexte sénégalais. "
+            "Si le profil de l'utilisateur est disponible, base tes conseils dessus."
+        ),
+    }
+    # Injecter le contexte du profil si disponible, sinon inviter à compléter l'évaluation
+    messages = [system_persona]
+    if st.session_state.get('profil_calcule', False):
+        scores = st.session_state.get('scores', {})
+        nom = st.session_state.get('nom', 'Non renseigné')
+        age = st.session_state.get('age', 'Non renseigné')
+        secteur = st.session_state.get('secteur', 'Non spécifié')
+        experience = st.session_state.get('experience', 'Non spécifiée')
+        try:
+            profil, _, _, moyenne = calculer_profil(scores)
+        except Exception:
+            profil, moyenne = "Non déterminé", 0.0
+        contexte_profil = (
+            f"Contexte utilisateur connu:\n"
+            f"- Nom: {nom}\n- Âge: {age}\n- Secteur: {secteur}\n- Expérience: {experience}\n"
+            f"- Profil: {profil}\n- Score global moyen: {moyenne:.2f}/5\n\n"
+            f"Scores par compétence:\n" +
+            "\n".join([f"- {comp}: {score:.2f}/5" for comp, score in scores.items()])
+        )
+        messages.append({"role": "system", "content": contexte_profil})
+    else:
+        messages.append({
+            "role": "system",
+            "content": (
+                "Le profil n'est pas encore rempli. Réponds à la question, puis invite poliment l'utilisateur à compléter l'onglet \"Évaluation\" afin d'obtenir des conseils plus personnalisés."
+            )
+        })
+    messages += chat_history
+    try:
+        stream = local_client.chat.completions.create(
+            model="deepseek-chat",
+            messages=messages,
+            temperature=temperature,
+            stream=True,
+        )
+        response_text = ""
+        placeholder = st.empty()
+        for chunk in stream:
+            if chunk.choices and chunk.choices[0].delta and chunk.choices[0].delta.content:
+                response_text += chunk.choices[0].delta.content
+                placeholder.markdown(response_text)
+        return response_text
+    except Exception as e:
+        st.error(f"Erreur lors du chat avec Adja: {str(e)}")
+        return ""
+
 # Définition des compétences
 COMPETENCES = {
     "Leadership": {
@@ -461,7 +526,8 @@ else:
     tab3_label += " 🔒"
 
 # Tabs pour l'interface avec labels améliorés
-tab1, tab2, tab3 = st.tabs([tab1_label, tab2_label, tab3_label])
+tab4_label = "👩🏾‍💼 Conseiller Adja"
+tab1, tab2, tab3, tab4 = st.tabs([tab1_label, tab2_label, tab3_label, tab4_label])
 
 with tab1:
     st.header("Évaluation des Compétences")
@@ -1253,6 +1319,22 @@ Sois concret, actionnable et adapté au contexte sénégalais."""
                 )
 
 # Footer
+with tab4:
+    st.header("👩🏾‍💼 Conseiller Adja")
+    st.caption("Adja répond uniquement aux questions d’entrepreneuriat.")
+    if 'adja_chat' not in st.session_state:
+        st.session_state['adja_chat'] = [
+            {"role": "assistant", "content": "Bonjour, je suis Adja, conseillère en entrepreneuriat au Sénégal. Pose ta question liée à l’entrepreneuriat."}
+        ]
+    for msg in st.session_state['adja_chat']:
+        st.chat_message(msg["role"]).markdown(msg["content"])
+    user_msg = st.chat_input("Pose ta question sur l’entrepreneuriat")
+    if user_msg:
+        st.session_state['adja_chat'].append({"role": "user", "content": user_msg})
+        with st.chat_message("assistant"):
+            response = adja_chat_stream(st.session_state['adja_chat'])
+        st.session_state['adja_chat'].append({"role": "assistant", "content": response})
+
 st.markdown("---")
 st.markdown("""
 <div style='text-align: center'>
