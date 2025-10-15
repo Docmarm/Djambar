@@ -403,6 +403,28 @@ st.markdown("""
         color: #333333 !important;
         border: 1px solid #dddddd !important;
     }
+
+    /* Style spécifique pour le bouton “Recommandations Sommaires – Cliquez ici !” */
+    .stButton button[aria-label="💡 Recommandations Sommaires - Cliquez ici !"] {
+        background: linear-gradient(135deg, #ff6b35, #f7931e) !important;
+        color: #ffffff !important;
+        border: none !important;
+        border-radius: 12px !important;
+        padding: 14px 20px !important;
+        box-shadow: 0 8px 24px rgba(247, 147, 30, 0.35) !important;
+        transition: transform 0.08s ease, box-shadow 0.2s ease, filter 0.2s ease !important;
+        width: 100% !important;
+        font-weight: 700 !important;
+        letter-spacing: 0.2px !important;
+    }
+    .stButton button[aria-label="💡 Recommandations Sommaires - Cliquez ici !"]:hover {
+        filter: brightness(1.03) !important;
+        box-shadow: 0 10px 28px rgba(247, 147, 30, 0.45) !important;
+    }
+    .stButton button[aria-label="💡 Recommandations Sommaires - Cliquez ici !"]:active {
+        transform: translateY(1px) !important;
+        box-shadow: 0 6px 16px rgba(247, 147, 30, 0.35) !important;
+    }
 </style>
 """, unsafe_allow_html=True)
 
