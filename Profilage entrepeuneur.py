@@ -46,10 +46,10 @@ TRANSLATIONS = {
         'tab_eval': "Évaluation",
         'tab_results': "Résultats",
         'tab_reco': "Recommandations",
-        'tab_adja': "Coach Fatoumata",
+        'tab_adja': "Coach Fatouma",
           'app_title': "🇸🇳 Outil de Profilage entrepreneuriale",
           'app_tagline': "Évaluez vos compétences entrepreneuriales et obtenez des recommandations personnalisées",
-          'adja_caption': "Fatoumata répond aux questions sur l'entrepreneuriat.",
+          'adja_caption': "Fatouma répond aux questions sur l'entrepreneuriat.",
         'tab1_header': "Évaluation des Compétences",
         'tab1_rubriques': "Rubriques d'évaluation",
         'tab1_instruction': "Sélectionnez une rubrique puis évaluez chaque affirmation sur une échelle de 1 (Pas du tout d'accord) à 5 (Tout à fait d'accord)",
@@ -98,7 +98,7 @@ TRANSLATIONS = {
         'journal_coaching_title': "📝 Journal de Coaching",
         'download_journal_csv': "💾 Télécharger Journal (CSV)",
         'journal_empty_caption': "Le journal de coaching est vide pour le moment.",
-        'adja_profile_success': "✅ Ton profil est pris en compte par Fatoumata pour des conseils personnalisés.",
+        'adja_profile_success': "✅ Ton profil est pris en compte par Fatouma pour des conseils personnalisés.",
           'adja_info_prompt': "ℹ️ Pour des conseils plus personnalisés, complète l’onglet ‘Évaluation’.",
         'goto_eval_button': "Aller à l’onglet Évaluation",
         'goto_eval_warning': "Clique sur l’onglet ‘Évaluation’ en haut de la page pour commencer.",
@@ -126,10 +126,10 @@ TRANSLATIONS = {
         'tab_eval': "Seetu Mën-mën yi",
         'tab_results': "njureef",
         'tab_reco': "Ndigël",
-        'tab_adja': "Cooc Fatoumata",
+        'tab_adja': "Cooc Fatouma",
         'app_title': "Jumtukaay bu seet profilu ëmbëru Senegaal",
         'app_tagline': "Seet sa mën-mën ci entrepreneuriat te am ndigël yu ci sa bopp",
-        'adja_caption': "Fatoumata dees na tontu laaj yi ci entrepreneuriat rekk.",
+        'adja_caption': "Fatouma dees na tontu laaj yi ci entrepreneuriat rekk.",
         'tab1_header': "Seetu Mën-mën yi",
         'tab1_rubriques': "Lislaasu seetu",
         'tab1_instruction': "Fal benn lislaas, te jéggal benn wax ci tegleel 1 di 5 (1: duñoo noppi, 5: noppi nopp)",
@@ -178,7 +178,7 @@ TRANSLATIONS = {
         'journal_coaching_title': "📝 Jurnal bu coaching",
         'download_journal_csv': "💾 Yebal Jurnal (CSV)",
         'journal_empty_caption': "Jurnal bu coaching bi des na.",
-        'adja_profile_success': "✅ Fatoumata dafa jëfandikoo sa profil ngir ndigël yu ci sa bopp.",
+        'adja_profile_success': "✅ Fatouma dafa jëfandikoo sa profil ngir ndigël yu ci sa bopp.",
           'adja_info_prompt': "ℹ️ Ngir am ndigël yu gën a tekki, seetal onglet ‘Seetu’.",
         'goto_eval_button': "Dellu ci onglet ‘Seetu’",
         'goto_eval_warning': "Seetu onglet ‘Seetu’ ci kaw bi ngir tàmbalee.",
@@ -478,8 +478,8 @@ def generate_recommendations_stream(prompt, temperature=0.7):
         st.error(f"Erreur lors de la génération des recommandations: {str(e)}")
         return ""
 
-# Chat Coach Fatoumata (restriction au domaine entrepreneuriat)
-def fatoumata_chat_stream(chat_history, temperature=0.7):
+# Chat Coach Fatouma (restriction au domaine entrepreneuriat)
+def Fatouma_chat_stream(chat_history, temperature=0.7):
     api_key = st.secrets.get("deepseek_api_key") or os.environ.get("DEEPSEEK_API_KEY")
     local_client = init_analysis_client(api_key)
     if local_client is None:
@@ -488,7 +488,7 @@ def fatoumata_chat_stream(chat_history, temperature=0.7):
     system_persona = {
         "role": "system",
         "content": (
-            "Tu es Fatoumata, Coach en entrepreneuriat au Sénégal. "
+            "Tu es Fatouma, Coach en entrepreneuriat au Sénégal. "
             "Tu réponds uniquement aux questions liées à l'entrepreneuriat: création, gestion, financement, marketing, stratégie, "
             "opérations, leadership, juridique, fiscalité, et ressources locales. "
             "Si une question est hors de ce domaine, réponds seulement: "
@@ -540,7 +540,7 @@ def fatoumata_chat_stream(chat_history, temperature=0.7):
                 placeholder.markdown(response_text)
         return response_text
     except Exception as e:
-        st.error(f"Erreur lors du chat avec Fatoumata: {str(e)}")
+        st.error(f"Erreur lors du chat avec Fatouma: {str(e)}")
         return ""
 
 # Définition des compétences
@@ -1787,25 +1787,25 @@ with tab4:
     st.caption(tr('adja_caption'))
     if 'coaching_journal' not in st.session_state:
         st.session_state['coaching_journal'] = []
-    if 'fatoumata_chat' not in st.session_state:
+    if 'Fatouma_chat' not in st.session_state:
         # Message d’accueil selon la langue
         lang = st.session_state.get('app_lang', 'Français')
         if lang == 'Wolof':
-            welcome = "Salaamaleekum, Cooc Fatoumata laa. Ci entrepreneuriat ci Senegaal laa. Laaj sa laaj bu jëm ci entrepreneuriat."
+            welcome = "Salaamaleekum, Cooc Fatouma laa. Ci entrepreneuriat ci Senegaal laa. Laaj sa laaj bu jëm ci entrepreneuriat."
         else:
-            welcome = "Bonjour, je suis Coach Fatoumata, spécialisée en entrepreneuriat au Sénégal. Pose ta question liée à l’entrepreneuriat."
-        st.session_state['fatoumata_chat'] = [{"role": "assistant", "content": welcome}]
-    for msg in st.session_state['fatoumata_chat']:
+            welcome = "Bonjour, je suis Coach Fatouma, spécialisée en entrepreneuriat au Sénégal. Pose ta question liée à l’entrepreneuriat."
+        st.session_state['Fatouma_chat'] = [{"role": "assistant", "content": welcome}]
+    for msg in st.session_state['Fatouma_chat']:
         st.chat_message(msg["role"]).markdown(msg["content"])
     # Placeholder de saisi selon la langue
     lang = st.session_state.get('app_lang', 'Français')
     placeholder = "Pose ta question sur l’entrepreneuriat" if lang == 'Français' else "Laaj sa laaj ci entrepreneuriat"
     user_msg = st.chat_input(placeholder)
     if user_msg:
-        st.session_state['fatoumata_chat'].append({"role": "user", "content": user_msg})
+        st.session_state['Fatouma_chat'].append({"role": "user", "content": user_msg})
         with st.chat_message("assistant"):
-            response = fatoumata_chat_stream(st.session_state['fatoumata_chat'])
-        st.session_state['fatoumata_chat'].append({"role": "assistant", "content": response})
+            response = Fatouma_chat_stream(st.session_state['Fatouma_chat'])
+        st.session_state['Fatouma_chat'].append({"role": "assistant", "content": response})
         st.session_state['coaching_journal'].append({
             "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M"),
             "question": user_msg,
